@@ -1,5 +1,5 @@
-# ModeCouplingTheory.jl
-[![Build status (Github Actions)](https://github.com/IlianPihlajamaa/ModeCouplingTheory.jl/workflows/CI/badge.svg)](https://github.com/IlianPihlajamaa/ModeCouplingTheory.jl/actions)
+# MCTBetaScaling.jl
+[![Build status (Github Actions)](https://github.com/IlianPihlajamaa/ModeCouplingTheory.jl/workflows/CI/badge.svg)](https://github.com/IlianPihlajamaa/MCTBetaScaling.jl/actions)
 [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://IlianPihlajamaa.github.io/MCTBetaScaling.jl/stable)
 [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://IlianPihlajamaa.github.io/MCTBetaScaling.jl/dev)
 
