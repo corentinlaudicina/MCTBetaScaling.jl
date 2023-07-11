@@ -24,7 +24,11 @@ plot(log10.(sol.t), log10.(abs.(sol.F)), ylabel="log_{10}(|g(t)|)", xlabel="log_
 
 ![image](docs/src/images/beta.png)
 
+
 In the figure, the slopes of the straight lines are given by the parameters $-a$ and $b$, which describe the relaxation towards and away from the plateau value of the correlator. These exponents are automatically computed, and are stored in `equation.coeff.a` and `equation.coeff.b`.
 
-## References
+### References
 Götze, J Phys Condens Matter 2, 8485 (1990)
+
+## To do:
+Add code to identify the eigenvalue `\lambda`.
