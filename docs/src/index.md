@@ -1,8 +1,3 @@
-# ModeCouplingTheory.jl
-[![Build status (Github Actions)](https://github.com/IlianPihlajamaa/ModeCouplingTheory.jl/workflows/CI/badge.svg)](https://github.com/IlianPihlajamaa/ModeCouplingTheory.jl/actions)
-[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://IlianPihlajamaa.github.io/MCTBetaScaling.jl/stable)
-[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://IlianPihlajamaa.github.io/MCTBetaScaling.jl/dev)
-
 ## Beta-scaling equation
 
 The beta-scaling model is implemented to make it easier to find critical exponents of MCT. The equation is
@@ -15,7 +10,8 @@ Here, $\sigma$ is the distance from the critical point, $\lambda$ is the relevan
 ### Example
 In order to solve the beta-scaling equation, we have to specify the parameters defining the equation and a time-scale `t0` that shifts the results. 
 ```julia
-using ModeCouplingTheory, Plots
+using ModeCouplingTheory
+using MCTBetaScaling, Plots
 λ = 0.7; ϵ = -0.1; t0 = 0.001
 equation = BetaScalingEquation(λ, ϵ, t0)
 sol = solve(equation, TimeDoublingSolver(t_max=10^4.))
