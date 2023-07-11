@@ -1,16 +1,10 @@
 using Documenter
 using MCTBetaScaling
 
-
-push!(LOAD_PATH,"../src/")
-
 makedocs(
     sitename = "MCTBetaScaling",
-    pages = [
-        "Introduction" => "index.md",
-        "API Reference" => "API.md",
-     ],
-     format = Documenter.HTML(prettyurls = false)
+    format = Documenter.HTML(),
+    modules = [MCTBetaScaling]
 )
 
 # Documenter can also automatically deploy documentation to gh-pages.

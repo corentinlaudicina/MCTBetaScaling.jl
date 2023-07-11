@@ -18,7 +18,7 @@ sol = solve(equation, TimeDoublingSolver(t_max=10^4.))
 plot(log10.(sol.t), log10.(abs.(sol.F)), ylabel="log_{10}(|g(t)|)", xlabel="log_{10}(t)", label="g(t)")
 ```
 
-![image](docs/src/images/beta.png)
+![image](images/beta.png)
 
 In the figure, the slopes of the straight lines are given by the parameters $-a$ and $b$, which describe the relaxation towards and away from the plateau value of the correlator. These exponents are automatically computed, and are stored in `equation.coeff.a` and `equation.coeff.b`.
 
