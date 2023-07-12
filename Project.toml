@@ -6,3 +6,6 @@ version = "0.0.1"
 [deps]
 ModeCouplingTheory = "6cad4188-63cb-4528-a10f-dbb409b456c6"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
+
+[compat]
+SpecialFunctions = "2"
