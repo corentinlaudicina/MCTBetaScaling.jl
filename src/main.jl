@@ -27,18 +27,3 @@ end
 
 display(fig)
 
-    # λ = 0.7; ϵ = -0.1; t0 = 0.001
-# equation = StochasticBetaScalingEquation(λ, ϵ, t0)
-# sol = solve(equation, TimeDoublingSolver(t_max=10^4.))
-
-# fig = Figure(size=(400,400))
-# ax = Axis(fig[1, 1], 
-#           title="β-scaling equation solution", 
-#           xlabel="t", 
-#           ylabel="|g(t)|", 
-#           yscale=log10, 
-#           xscale=log10)
-
-# lines!(ax, sol.t[2:end], abs.(sol.F[2:end]), label="g(t)")
-
-# display(fig)

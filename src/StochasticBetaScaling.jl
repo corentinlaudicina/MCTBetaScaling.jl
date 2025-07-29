@@ -269,7 +269,7 @@ end
 
 function update_Fuchs_parameters!(equation::StochasticBetaScalingEquation, solver::ModeCouplingTheory.TimeDoublingSolver, temp_arrays::ModeCouplingTheory.SolverCache, it::Int)
     N = solver.N
-    i2 = 2N
+    i2 = it ÷ 2
     δt = solver.Δt / (4N)
     F_I = temp_arrays.F_I
     F = temp_arrays.F_temp
@@ -308,12 +308,12 @@ end
 #     #temp_arrays.F_temp[it] = c1 \ (F_old*F_old*c2 + c3)
 # end
 
-function update_F!(::StochasticBetaScalingEquation, ::ModeCouplingTheory.TimeDoublingSolver, temp_arrays::ModeCouplingTheory.SolverCache, it::Int)
+function update_F!(eq::StochasticBetaScalingEquation, ::ModeCouplingTheory.TimeDoublingSolver, temp_arrays::ModeCouplingTheory.SolverCache, it::Int)
     C1 = temp_arrays.C1
     C2 = temp_arrays.C2
     C3 = temp_arrays.C3
     F = temp_arrays.F_temp
-    Nx = length(C1)
+    Nx = eq.Nx
 
     for k in 1:Nx
         disc = (C1[k] / (2 * C2[k]))^2 - C3[k] / C2[k]
