@@ -23,6 +23,9 @@ function regula_falsi(x0, x1, f; accuracy=10^-10, max_iterations::Integer=10^4)
     fa, fb = f(x0), f(x1)
     dx = xb-xa
     xguess = (xa + xb)/2
+
+    @assert dx > exp10(-10)
+
     while iterations==0 || (dx > accuracy && iterations <= max_iterations)
         # regula falsi: estimate the zero of f(x) by the secant,
         # check f(xguess) and use xguess as one of the new endpoints of
@@ -48,4 +51,27 @@ function regula_falsi(x0, x1, f; accuracy=10^-10, max_iterations::Integer=10^4)
         dx = xb - xa
     end
     return xguess
+end
+
+
+function bisection(xlo, xhi, f, accuracy=10^-10, max_iterations=10^4)
+    iterations = 0
+    if f(xlo) * f(xhi) > 0
+        @show "f(xlo): $(f(xlo)), f(xhi): $(f(xhi))"
+        error("f(xlo) and f(xhi) must have opposite signs.")
+    end
+
+    while iterations < max_iterations
+        xmid = (xlo + xhi) / 2
+        fmid = f(xmid)
+        if abs(fmid) < accuracy
+            return xmid
+        elseif f(xlo) * fmid < 0
+            xhi = xmid
+        else
+            xlo = xmid
+        end
+        iterations += 1
+    end
+    error("Bisection method did not converge within the maximum number of iterations.")
 end
