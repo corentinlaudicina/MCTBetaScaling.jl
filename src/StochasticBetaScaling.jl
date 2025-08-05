@@ -237,9 +237,9 @@ function update_Fuchs_parameters!(equation::StochasticBetaScalingEquation, solve
     c3 .+= σ .- δ_times_t
 
     ## compute Laplacian of F[it]
-    dx = equation.coeffs.L_sys / sqrt(equation.Nx)
-    mylaplacian = Laplacian2D5pt(sqrt(equation.Nx), sqrt(equation.Nx), dx)
-    LinearAlgebra.mul!(temp_arrays.temp_vec, mylaplacian, F[it])
+    # dx = equation.coeffs.L_sys / sqrt(equation.Nx)
+    # mylaplacian = Laplacian2D5pt(sqrt(equation.Nx), sqrt(equation.Nx), dx)
+    # LinearAlgebra.mul!(temp_arrays.temp_vec, mylaplacian, F[it])
 
     @inbounds for j = 2:i2
         c3 .+= (F[it-j] .- F[it-j+1]) .* F_I[j]
@@ -277,7 +277,7 @@ function update_F!(equation::StochasticBetaScalingEquation, solver::ModeCoupling
     for i in eachindex(equation.coeffs.σ)
        temp_arrays.F_temp[it][i] = 2temp_arrays.F_temp[it-1][i] - temp_arrays.F_temp[it-2][i] 
     end
-    newF = zeros(length(equation.coeffs.σ))
+    newF = temp_arrays.temp_vec
     for i in eachindex(equation.coeffs.σ)
         newF[i] = temp_arrays.F_temp[it][i]
     end
@@ -286,52 +286,45 @@ function update_F!(equation::StochasticBetaScalingEquation, solver::ModeCoupling
     λ = equation.coeffs.λ
 
     while !passed 
-        non_center_terms = get_non_center_terms(Lap, temp_arrays.F_temp[it])
-        center_terms = get_center_term(Lap, temp_arrays.F_temp[it])
+        non_center_terms = α * get_non_center_terms(Lap, temp_arrays.F_temp[it])
+        center_terms = -α * get_center_term(Lap, temp_arrays.F_temp[it])
         for i in eachindex(equation.coeffs.σ)
-            # _a = c3[i] - α * non_center_terms[i]
-            # _b = -c1[i] - α * center_terms[i]
-            # @show c1[i], c2[i], c3[i]
-            # @show _a, _b, λ
-            # temp_func = x -> -_b*x + λ*x^2 - _a
-            # a,b,c = -_a, -_b, λ
-            # x1 = -b / (2 * a) + sqrt((b^2 - 4*a*c) / (4*a^2))
-            # x2 = -b / (2 * a) - sqrt((b^2 - 4*a*c) / (4*a^2))
-            # @show "x1: $x1, x2: $x2"
-            # @show _a, _b, λ
-            # newF[i] = regula_falsi(temp_arrays.F_temp[it][i], newF[i], temp_func)
-            # @show newF[i]
-            # @show temp_arrays.F_temp[it][i]
+            # _b = -c1[i]/2 - center_terms[i]/2
+            # λ = c2[i]
+            # _a = c3[i] + non_center_terms[i]
+            # temp_func = x -> 2*_b*x + λ*x^2 + _a
+            # newF[i] = regula_falsi(lo, hi, temp_func)
 
-            c1[i] += α * center_terms[i]
+            # # Coupling
+            disc = ((c1[i] + center_terms[i]) / (2 * c2[i]))^2 - (c3[i] + non_center_terms[i]) / c2[i]
+            newF[i] =(c1[i] + center_terms[i]) / (2 * c2[i]) - sqrt(disc)
 
-            _b = -c1[i]/2
-            λ = c2[i]
-            _a = c3[i]
-            temp_func = x -> 2*_b*x + λ*x^2 + _a
-
-            @show newF[i]
-            disc = (c1[i] / (2 * c2[i]))^2 - c3[i] / c2[i]
-            @show c1[i] / (2 * c2[i]) - sqrt(disc)
-
-            @show regula_falsi(5.0, 20.0, temp_func)
-
-            error()
-
-            if abs(newF[i] - temp_arrays.F_temp[it][i]) < tolerance*abs(temp_arrays.F_temp[it][i]) || iterations > max_iterations
-                passed = true
-            end
+            # if abs(newF[i] - temp_arrays.F_temp[it][i]) < tolerance*abs(temp_arrays.F_temp[it][i]) 
+            #     passed = true
+            # end
         end
+
+        # check if all i satisfy reltol
+        max_rel_err = 10000000.0
+        for i in eachindex(equation.coeffs.σ)
+            rel_err = abs(newF[i] - temp_arrays.F_temp[it][i]) / abs(temp_arrays.F_temp[it][i])
+            max_rel_err = min(max_rel_err, rel_err)
+        end
+        if max_rel_err < tolerance
+            passed = true
+        end
+
 
         for i in eachindex(equation.coeffs.σ)
             temp_arrays.F_temp[it][i] = newF[i]
         end
 
         if passed 
-            # for i in eachindex(equation.coeffs.σ)
-            #     temp_arrays.F_temp[it][i] = newF[i]
-            # end
             break 
+        end
+
+        if iterations > max_iterations
+            error("Maximum iterations reached without convergence for time step $it.")
         end
         iterations += 1
     end
