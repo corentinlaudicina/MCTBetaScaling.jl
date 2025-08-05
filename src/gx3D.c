@@ -186,9 +186,6 @@ fp exponent_func (fp x) {
  IMPORTANT modification I have added also the correction due to the random temperature because otherwise 
  the fluctuations were not ok at short times.
  */
-
-
-
 void initial_values (uint imax) {
   uint i,n;
   fp t;

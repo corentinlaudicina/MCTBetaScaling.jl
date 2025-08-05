@@ -182,7 +182,7 @@ function initialize_F_temp!(equation::StochasticBetaScalingEquation, solver::Mod
     δt = solver.Δt / (4 * N)
     t₀ = equation.coeffs.t₀
     a = equation.coeffs.a
-
+    # Need to fix this with correction for alpha!!!!!!!!!
     for it = 1:2N
         temp_arrays.F_temp[it] .= (δt * it / t₀)^-a
     end
@@ -203,6 +203,7 @@ function initialize_integrals!(equation::StochasticBetaScalingEquation, solver::
     δt = solver.Δt / (4 * N)
     t₀ = equation.coeffs.t₀
     a = equation.coeffs.a
+    # Need to fix this with correction for alpha!!!!!!!!!
 
     F1 = (t₀ / δt)^a / (1 - a)
     F_I[1] .= F1
@@ -293,7 +294,7 @@ function update_F!(equation::StochasticBetaScalingEquation, solver::ModeCoupling
             # λ = c2[i]
             # _a = c3[i] + non_center_terms[i]
             # temp_func = x -> 2*_b*x + λ*x^2 + _a
-            # newF[i] = regula_falsi(lo, hi, temp_func)
+            # newF[i] = regula_falsi(10.0, 20.0, temp_func)
 
             # # Coupling
             disc = ((c1[i] + center_terms[i]) / (2 * c2[i]))^2 - (c3[i] + non_center_terms[i]) / c2[i]
