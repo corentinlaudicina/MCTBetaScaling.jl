@@ -11,13 +11,17 @@ import ModeCouplingTheory.do_time_steps!
 import ModeCouplingTheory.update_integrals!
 
 using SpecialFunctions, LinearAlgebra
+using FFTW, Statistics
+
 include("HelperFunctions.jl")
+
  
 struct Laplacian2D5pt
     nx::Int
     ny::Int
     dx::Float64
 end
+
 
 mutable struct StochasticBetaScalingEquationCoefficients{T, V}
     λ::T
@@ -28,7 +32,8 @@ mutable struct StochasticBetaScalingEquationCoefficients{T, V}
     δ_times_t::V
     a::T
     b::T
-    L_sys::T ## physical size of the system
+    L_sys::T
+    A1::T           
 end
 
 struct StochasticBetaScalingEquation{T,A,B,C,D} <: AbstractNoKernelEquation
@@ -40,94 +45,41 @@ struct StochasticBetaScalingEquation{T,A,B,C,D} <: AbstractNoKernelEquation
     Nx::Int ## number of spatial sites
 end
 
-function LinearAlgebra.mul!(out::Vector{Float64}, L::Laplacian2D5pt, x::Vector{Float64})
-    nx, ny, dx = L.nx, L.ny, L.dx
-    dx2_inv = 1.0 / dx^2
-    grid_size = (nx, ny)
-
-    # Reshape vectors into 2D arrays using the grid size
-    X = reshape(x, grid_size)
-    O = reshape(out, grid_size)
-
-    @inbounds for I in CartesianIndices(grid_size)
-        i, j = Tuple(I)
-
-        # Wrap-around (periodic boundary conditions)
-        ip = i == nx ? 1 : i + 1
-        im = i == 1  ? nx : i - 1
-        jp = j == ny ? 1 : j + 1
-        jm = j == 1  ? ny : j - 1
-
-        # Sum neighbors and subtract center
-
-        O[I] = (
-            X[im, j] + X[ip, j] +
-            X[i, jm] + X[i, jp] -
-            4 * X[I]
-        ) * dx2_inv
-    end
-    return out
+function StochasticBetaScalingEquationCoefficients(λ, α, σ, t₀, δ, L_sys)
+    exponent_func = (x) -> (SpecialFunctions.gamma(1 - x) / SpecialFunctions.gamma(1 - 2x)) * SpecialFunctions.gamma(1 - x) - λ
+    a = regula_falsi(0.2, 0.3, exponent_func)
+    b = -regula_falsi(-0.5, -0.1, exponent_func)
+    A1 = 1/(2 *(a * π / sin(a*π)-λ))
+    return StochasticBetaScalingEquationCoefficients(λ, α, σ, t₀, δ, δ*0.0, a, b, L_sys, A1)
 end
 
-function get_center_term(L::Laplacian2D5pt, x::Vector{Float64})
-    nx, ny = L.nx, L.ny
-    grid_size = (nx, ny)
-    dx = L.dx
-    # Reshape vectors into 2D arrays using the grid size
-    X = reshape(x, grid_size)
-    
-    out = similar(x)
-    O = reshape(out, grid_size)
-
-    @inbounds for I in CartesianIndices(grid_size)
-        i, j = Tuple(I)
-        O[I] = - 4 * X[i, j] / dx^2
+function StochasticBetaScalingEquation(λ::Float64, α::Float64, σ::Vector{Float64}, t₀::Float64, L_sys::Float64; δ=zeros(length(σ)))
+    coeffs = StochasticBetaScalingEquationCoefficients(λ, α, σ, t₀, δ, L_sys)
+    function update_coefficients!(coeffs::StochasticBetaScalingEquationCoefficients, t::Float64)
+        @inbounds for k in eachindex(coeffs.σ)
+            coeffs.δ_times_t[k] = coeffs.δ[k] * t
+        end
     end
-    return out
+    Nx = length(σ)
+    F0 = fill(0.0, Nx)
+    return StochasticBetaScalingEquation(coeffs, F0, nothing, nothing, update_coefficients!, Nx)
 end
 
-function get_non_center_terms(L::Laplacian2D5pt, x::Vector{Float64})
-    nx, ny = L.nx, L.ny
-    grid_size = (nx, ny)
-    dx = L.dx
-    # Reshape vectors into 2D arrays using the grid size
-    X = reshape(x, grid_size)
-    out = similar(x)
-    O = reshape(out, grid_size)
 
-    @inbounds for I in CartesianIndices(grid_size)
-        i, j = Tuple(I)
 
-        # Wrap-around (periodic boundary conditions)
-        ip = i == nx ? 1 : i + 1
-        im = i == 1  ? nx : i - 1
-        jp = j == ny ? 1 : j + 1
-        jm = j == 1  ? ny : j - 1
 
-        O[I] = (
-            X[im, j] + X[ip, j] +
-            X[i, jm] + X[i, jp]
-        ) / dx^2
-    end
-    return out
-end
 
 
 function Base.show(io::IO, ::MIME"text/plain", p::StochasticBetaScalingEquation)
-    println(io, "MCT beta-scaling object:")
+    println(io, "MCT Stochastic beta-scaling object:")
     println(io, "   σ - δ t + λ (g(t))² = ∂ₜ∫g(t-τ)g(τ)dτ")
     println(io, "with real-valued parameters.")
 end
 
 
-function StochasticBetaScalingEquationCoefficients(λ, α, σ, t₀, δ, L_sys)
-    exponent_func = (x) -> (SpecialFunctions.gamma(1 - x) / SpecialFunctions.gamma(1 - 2x)) * SpecialFunctions.gamma(1 - x) - λ
-    a = regula_falsi(0.2, 0.3, exponent_func)
-    b = -regula_falsi(-0.5, -0.1, exponent_func)
-    return StochasticBetaScalingEquationCoefficients(λ, α, σ, t₀, δ, δ*0.0, a, b, L_sys)
-end
 
-function StochasticBetaScalingEquation(λ::Float64, α::Float64, σ::Vector{Float64}, t₀::Float64, L_sys::Float64; δ=zeros(length(σ)))
+
+function StochasticBetaScalingEquation(λ::Float64, α::Float64, σ::Vector{Float64}, t₀::Float64, L_sys::Float64; δ=zeros(length(σ)), A1::Float64=1.0)
     coeffs = StochasticBetaScalingEquationCoefficients(λ, α, σ, t₀, δ, L_sys)
     function update_coefficients!(coeffs::StochasticBetaScalingEquationCoefficients, t::Float64)
         @inbounds for k in eachindex(coeffs.σ)
@@ -139,33 +91,44 @@ function StochasticBetaScalingEquation(λ::Float64, α::Float64, σ::Vector{Floa
     return StochasticBetaScalingEquation(coeffs, F0, nothing, nothing, update_coefficients!, Nx)
 end
 
-function allocate_temporary_arrays(eq::StochasticBetaScalingEquation, solver::ModeCouplingTheory.TimeDoublingSolver)
+
+
+function allocate_temporary_arrays(eq::StochasticBetaScalingEquation,
+                                   solver::ModeCouplingTheory.TimeDoublingSolver)
     start_time = time()
     F_temp = Vector{Float64}[]
-    F_I = Vector{Float64}[]
+    F_I    = Vector{Float64}[]
+    Nx     = eq.Nx
+    nside  = Int(sqrt(Nx))
+    @assert nside*nside == Nx "Nx must be a perfect square (2D grid)."
+
+    # Build spectral cache once
+    Lx = eq.coeffs.L_sys
+    Ly = eq.coeffs.L_sys
+
     temp_arrays = ModeCouplingTheory.SolverCache(
-                                  F_temp, 
-                                  nothing, 
-                                  F_I, 
-                                  nothing, 
-                                  zeros(eq.Nx), # c1
-                                  zeros(eq.Nx), # c1_temp
-                                  zeros(eq.Nx), # c2
-                                  zeros(eq.Nx), # c3
-                                  zeros(eq.Nx), # temp_vec
-                                  zeros(eq.Nx), # F_old
-                                  nothing, #temp_mat
-                                  nothing, # linsolvecache
-                                  true, 
-                                  start_time
+        F_temp,
+        nothing,
+        F_I,
+        nothing,
+        zeros(Nx),   # c1
+        zeros(Nx),   # c1_temp
+        zeros(Nx),   # c2
+        zeros(Nx),   # c3
+        zeros(Nx),   # temp_vec
+        zeros(Nx),   # F_old
+        nothing,     # temp_mat
+        nothing,   # solve_cache
+        true,
+        start_time
     )
-    Nx = eq.Nx
     for _ in 1:4*solver.N
         push!(temp_arrays.F_temp, fill(0.0, Nx))
-        push!(temp_arrays.F_I, fill(0.0, Nx))
+        push!(temp_arrays.F_I,    fill(0.0, Nx))
     end
     return temp_arrays
 end
+
 
 
 """
@@ -177,14 +140,22 @@ Fills the first 2N entries of the temporary arrays needed for solving the
 In particular, this initializes g(t) = (t/t₀)^-a.
 
 """
-function initialize_F_temp!(equation::StochasticBetaScalingEquation, solver::ModeCouplingTheory.TimeDoublingSolver, temp_arrays::ModeCouplingTheory.SolverCache)
-    N = solver.N
-    δt = solver.Δt / (4 * N)
+function initialize_F_temp!(equation::StochasticBetaScalingEquation,
+                            solver::ModeCouplingTheory.TimeDoublingSolver,
+                            temp_arrays::ModeCouplingTheory.SolverCache)
+    N  = solver.N
+    δt = solver.Δt / (4N)
     t₀ = equation.coeffs.t₀
-    a = equation.coeffs.a
-    # Need to fix this with correction for alpha!!!!!!!!!
+    a  = equation.coeffs.a
+    A1 = equation.coeffs.A1
+    σ  = equation.coeffs.σ
+
+    # g(x, t_i) = (t_i/t0)^(-a) + A1 * σ(x) * (t_i/t0)^(a)
     for it = 1:2N
-        temp_arrays.F_temp[it] .= (δt * it / t₀)^-a
+        τ = (δt * it) / t₀
+        base = τ^(-a)
+        corr = (τ^a) .* (A1 .* σ)
+        @. temp_arrays.F_temp[it] = base + corr
     end
 end
 
@@ -197,21 +168,30 @@ of the β-scaling equation, using the known critical decay law as the
 short-time asymptote.
 
 """
-function initialize_integrals!(equation::StochasticBetaScalingEquation, solver::ModeCouplingTheory.TimeDoublingSolver, temp_arrays::ModeCouplingTheory.SolverCache)
+function initialize_integrals!(equation::StochasticBetaScalingEquation,
+                               solver::ModeCouplingTheory.TimeDoublingSolver,
+                               temp_arrays::SolverCache)
     F_I = temp_arrays.F_I
-    N = solver.N
-    δt = solver.Δt / (4 * N)
-    t₀ = equation.coeffs.t₀
-    a = equation.coeffs.a
-    # Need to fix this with correction for alpha!!!!!!!!!
+    N   = solver.N
+    δt  = solver.Δt / (4N)
+    t₀  = equation.coeffs.t₀
+    a   = equation.coeffs.a
+    A1  = equation.coeffs.A1
+    σ   = equation.coeffs.σ
 
-    F1 = (t₀ / δt)^a / (1 - a)
-    F_I[1] .= F1
-    for it = 2:2N
-        val = F1 * (it^(1 - a) - (it - 1)^(1 - a))
-        F_I[it] .= val
+    # Precompute scalar factors
+    fac_minus = (δt / t₀)^(-a) / (1 - a)
+    fac_plus  = (δt / t₀)^( a) / (1 + a)
+
+    # k = 1..2N bins; each F_I[k] is a length-Nx vector (site-dependent due to σ)
+    for k = 1:2N
+        inc_minus = fac_minus * (k^(1 - a) - (k-1)^(1 - a))
+        inc_plus  = fac_plus  * (k^(1 + a) - (k-1)^(1 + a))
+        @. F_I[k] = inc_minus + A1 * σ * inc_plus
     end
 end
+
+
 
 """
     update_Fuchs_parameters!(equation::BetaScalingEquation, solver::ModeCouplingTheory.TimeDoublingSolver, temp_arrays::ModeCouplingTheory.SolverCache, it::Int)
@@ -219,127 +199,144 @@ end
 Updates the parameters that are needed to solve the β-scaling equation
 numerically with Fuchs' scheme.
 """
-function update_Fuchs_parameters!(equation::StochasticBetaScalingEquation, solver::ModeCouplingTheory.TimeDoublingSolver, temp_arrays::ModeCouplingTheory.SolverCache, it::Int)
-    N = solver.N
-    i2 = it ÷ 2
-    δt = solver.Δt / (4N)
-    F_I = temp_arrays.F_I
-    F = temp_arrays.F_temp
+function update_Fuchs_parameters!(equation::StochasticBetaScalingEquation,
+                                  solver::ModeCouplingTheory.TimeDoublingSolver,
+                                  temp_arrays::ModeCouplingTheory.SolverCache,
+                                  it::Int)
+    N   = solver.N
+    i2  = it ÷ 2
+    δt  = solver.Δt / (4N)
+
+    F_I = temp_arrays.F_I         # vector moments dG_k (sitewise due to σ-correction)
+    F   = temp_arrays.F_temp      # g at stored times
+
+    # advance δ * t
     equation.update_coefficients!(equation.coeffs, δt * it)
-    λ = equation.coeffs.λ
-    α = equation.coeffs.α
-    σ = equation.coeffs.σ
+
+    λ         = equation.coeffs.λ
+    σ         = equation.coeffs.σ
     δ_times_t = equation.coeffs.δ_times_t
 
-    temp_arrays.C1 = 2 * F_I[1]
+    # C1 = 2 dG1  (sitewise)
+    temp_arrays.C1 .= 2 .* F_I[1]
+    # (C2 not used by the Picard solve, but keep for compatibility)
     temp_arrays.C2 .= λ
-
-    c3 = -F[it-i2] .* F[i2] .+ 2 .* F[it-1] .* F_I[1]
-    c3 .+= σ .- δ_times_t
-
-    ## compute Laplacian of F[it]
-    # dx = equation.coeffs.L_sys / sqrt(equation.Nx)
-    # mylaplacian = Laplacian2D5pt(sqrt(equation.Nx), sqrt(equation.Nx), dx)
-    # LinearAlgebra.mul!(temp_arrays.temp_vec, mylaplacian, F[it])
-
-    @inbounds for j = 2:i2
-        c3 .+= (F[it-j] .- F[it-j+1]) .* F_I[j]
-    end
-    @inbounds for j = 2:it-i2
-        c3 .+= (F[it-j] .- F[it-j+1]) .* F_I[j]
-    end
-    @inbounds if it-i2 != i2
-       c3 .+= (F[i2] .- F[i2+1]) .* F_I[it-i2]
-    end
-    temp_arrays.C3 .= c3
-end
-
-
-<<<<<<< HEAD
-function update_F!(eq::StochasticBetaScalingEquation, ::ModeCouplingTheory.TimeDoublingSolver, temp_arrays::ModeCouplingTheory.SolverCache, it::Int)
-    C1 = temp_arrays.C1
-    C2 = temp_arrays.C2
-    C3 = temp_arrays.C3
-    F = temp_arrays.F_temp
-    Nx = eq.Nx
-=======
-function update_F!(equation::StochasticBetaScalingEquation, solver::ModeCouplingTheory.TimeDoublingSolver, temp_arrays::ModeCouplingTheory.SolverCache, it::Int)
-    α = equation.coeffs.α
-    tolerance = solver.tolerance
-    max_iterations = solver.max_iterations
->>>>>>> d6cae7d6141d929ed71d3c04e23bfc44bc7e3f4e
-
-    Lap = Laplacian2D5pt(sqrt(equation.Nx), sqrt(equation.Nx), equation.coeffs.L_sys / sqrt(equation.Nx))
-
-    c1 = temp_arrays.C1
-    c2 = temp_arrays.C2
     c3 = temp_arrays.C3
-    # F_old = temp_arrays.F_temp[it]
-    for i in eachindex(equation.coeffs.σ)
-        disc = (c1[i] / (2 * c2[i]))^2 - c3[i] / c2[i]
-        temp_arrays.F_temp[it][i] = c1[i] / (2 * c2[i]) - sqrt(disc) 
+    # C̃_i = Σ_i + g_{i-i2} g_{i2} - 2 g_{i-1} dG1 + (δ t_i - σ)
+    c3 .= F[it - i2] .* F[i2] .- 2 .* F[it - 1] .* F_I[1]
+    c3 .+= (δ_times_t .- σ)
+
+    # Σ_i = 2 * sum_{j=2}^{i2} (g_{i-j+1}-g_{i-j}) dG_j  + middle term if i odd
+    s = temp_arrays.temp_vec
+    s .= zero(eltype(s))
+    @inbounds for j = 2:i2
+        s .+= (F[it - j + 1] .- F[it - j]) .* F_I[j]
     end
-
-    # if (α == 0)
-    #     return
-    # end
-    # extrapolation guess
-    for i in eachindex(equation.coeffs.σ)
-       temp_arrays.F_temp[it][i] = 2temp_arrays.F_temp[it-1][i] - temp_arrays.F_temp[it-2][i] 
+    c3 .+= 2 .* s
+    if isodd(it)
+        jmid = it - i2               # == i2 + 1
+        c3 .+= (F[i2 + 1] .- F[i2]) .* F_I[jmid]
     end
-    newF = temp_arrays.temp_vec
-    for i in eachindex(equation.coeffs.σ)
-        newF[i] = temp_arrays.F_temp[it][i]
-    end
-    iterations = 0
-    passed = false
-    λ = equation.coeffs.λ
-
-    while !passed 
-        non_center_terms = α * get_non_center_terms(Lap, temp_arrays.F_temp[it])
-        center_terms = -α * get_center_term(Lap, temp_arrays.F_temp[it])
-        for i in eachindex(equation.coeffs.σ)
-            # _b = -c1[i]/2 - center_terms[i]/2
-            # λ = c2[i]
-            # _a = c3[i] + non_center_terms[i]
-            # temp_func = x -> 2*_b*x + λ*x^2 + _a
-            # newF[i] = regula_falsi(10.0, 20.0, temp_func)
-
-            # # Coupling
-            disc = ((c1[i] + center_terms[i]) / (2 * c2[i]))^2 - (c3[i] + non_center_terms[i]) / c2[i]
-            newF[i] =(c1[i] + center_terms[i]) / (2 * c2[i]) - sqrt(disc)
-
-            # if abs(newF[i] - temp_arrays.F_temp[it][i]) < tolerance*abs(temp_arrays.F_temp[it][i]) 
-            #     passed = true
-            # end
-        end
-
-        # check if all i satisfy reltol
-        max_rel_err = 10000000.0
-        for i in eachindex(equation.coeffs.σ)
-            rel_err = abs(newF[i] - temp_arrays.F_temp[it][i]) / abs(temp_arrays.F_temp[it][i])
-            max_rel_err = min(max_rel_err, rel_err)
-        end
-        if max_rel_err < tolerance
-            passed = true
-        end
-
-
-        for i in eachindex(equation.coeffs.σ)
-            temp_arrays.F_temp[it][i] = newF[i]
-        end
-
-        if passed 
-            break 
-        end
-
-        if iterations > max_iterations
-            error("Maximum iterations reached without convergence for time step $it.")
-        end
-        iterations += 1
-    end
-    #temp_arrays.F_temp[it] = c1 \ (F_old*F_old*c2 + c3)
 end
+
+
+# Periodic 4-neighbour sum: out = sum of N,S,E,W of x
+function neighbor_sum4!(out::Vector{Float64}, x::Vector{Float64}, nside::Int)
+    X = reshape(x, nside, nside)
+    O = reshape(out, nside, nside)
+    @inbounds for j in 1:nside, i in 1:nside
+        ip = (i == nside) ? 1 : i+1
+        im = (i == 1)     ? nside : i-1
+        jp = (j == nside) ? 1 : j+1
+        jm = (j == 1)     ? nside : j-1
+        O[i,j] = X[im,j] + X[ip,j] + X[i,jm] + X[i,jp]
+    end
+    return out
+end
+
+
+
+function update_F!(equation::StochasticBetaScalingEquation,
+                   solver::ModeCouplingTheory.TimeDoublingSolver,
+                   temp::ModeCouplingTheory.SolverCache,
+                   it::Int)
+
+    λ  = equation.coeffs.λ
+    α  = equation.coeffs.α
+    C1 = temp.C1          # length Nx
+    C3 = temp.C3
+
+    # grid/spacing
+    Nx    = length(C1)
+    nside = Int(round(sqrt(Nx)))
+    @assert nside*nside == Nx "Nx must be a perfect square grid."
+    dx    = equation.coeffs.L_sys / nside
+    αeff  = α / (dx*dx)
+    z     = 2.0           # 2D: 4 neighbours → center shift = 2*αeff
+
+    # time slices
+    g  = temp.F_temp[it]
+    g1 = temp.F_temp[it-1]
+    g2 = temp.F_temp[it-2]
+
+    # extrapolated start
+    @inbounds @simd for i in 1:Nx
+        g[i] = 2*g1[i] - g2[i]
+    end
+
+    # g0 bracket (reuse cache F_old)
+    g0 = temp.F_old
+    @inbounds @simd for i in 1:Nx
+        g0[i] = root_no_nabla(C1[i], C3[i], λ)
+    end
+
+    # b_i = C1/2 + z*αeff  (reuse c1_temp)
+    b = temp.C1_temp
+    @inbounds @simd for i in 1:Nx
+        b[i] = 0.5*C1[i] + z*αeff
+    end
+
+    # work buffer (sumNN, then overwritten with a_i)
+    work = temp.temp_vec
+
+    maxit   = (solver.max_iterations > 0) ? solver.max_iterations : 200
+    tol_rel = (solver.tolerance > 0) ? solver.tolerance : 1e-9
+
+    iters = 0
+    while true
+        # sumNN = Σ_4nn g
+        neighbor_sum4!(work, g, nside)
+
+        # work := a_i = C3 - αeff * sumNN
+        @inbounds for i in 1:Nx
+            work[i] = C3[i] - αeff*work[i]
+        end
+
+        # sitewise regula falsi, in-place update of g
+        maxrel = 0.0
+        @inbounds for i in 1:Nx
+            gi_old = g[i]
+            ok, gi_try = quad_root_safe(λ, b[i], work[i], gi_old)
+            gi_new = ok ? gi_try : regula_falsi_illinois(λ, b[i], work[i], gi_old, g0[i];
+                                                    tol=1e-12, maxit=200)
+
+
+            # gi_old = g[i]
+            # gi_new = regula_falsi_quad(λ, b[i], work[i], gi_old, g0[i];
+            #                            tol=1e-12, maxit=200)
+            g[i] = gi_new
+            denom = abs(gi_old); if denom < 1e-14; denom = 1e-14; end
+            rel = abs(gi_new - gi_old) / denom
+            if rel > maxrel; maxrel = rel; end
+        end
+
+        iters += 1
+        if (maxrel <= tol_rel) || (iters >= maxit)
+            return
+        end
+    end
+end
+
 
 
 
