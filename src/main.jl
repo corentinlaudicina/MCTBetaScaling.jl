@@ -1,29 +1,52 @@
 import Pkg;
 Pkg.activate(".")
-
+using Revise, Random
 using ModeCouplingTheory, CairoMakie
-include("StochasticBetaScaling.jl")
+include("MCTBetaScaling.jl")
 
+Random.seed!(1234)  # For reproducibility
 
-Nx = 10
-σ_vec = randn(Nx) * 0.01   # small random variations near σ = 0
+solver = TimeDoublingSolver(t_max=10^10., verbose=true, tolerance=1e-10, N=124, Δt=1e-8)
+
+L_sys = 10.0 ## physical size of the system
+L = 10 ## number of sites on one side of the square lattice
+dx = L_sys / L
+
 λ = 0.75
+α = 0.07
 t₀ = 0.001
-eqn_sys = StochasticBetaScalingEquation(λ, σ_vec, t₀)
 
-sol = solve(eqn_sys, TimeDoublingSolver(t_max=10^4.))
+sigma2 = 0.01  # desired variance
+sigma_limits = sqrt(3 * sigma2)
+x(ϵ) = rand() * 2 * ϵ - ϵ  # Uniform in (-ε, +ε)
 
-fig = Figure(size=(400, 400))
+σ_vec = [x(sigma_limits) for i in 1:L^2]  # small random variations near σ = 0
+
+n_pos = sum(σ > 0 for σ in σ_vec)
+n_neg = sum(σ < 0 for σ in σ_vec)
+
+println("Number of positive σ: $n_pos, negative σ: $n_neg")
+
+eqn_sys = MCTBetaScaling.StochasticBetaScalingEquation(λ, α, σ_vec, t₀, L_sys)
+sol = @time solve(eqn_sys, solver)
+
+fig = Figure(size=(1400, 1400))
 ax = Axis(fig[1, 1],
             title="β-scaling equation solution",
             xlabel="t",
             ylabel="|g(t)|",
             yscale=log10,
-            xscale=log10)
-for i in Nx
+            xscale=log10,
+            limits=(1e-10, 1e-0, 1e-4, 1e6),
+         )
+
+for i in 1:50:L^2
     F = get_F(sol, :, i)
-    lines!(ax, sol.t[2:end], abs.(F[2:end]), label="g(t)")
+    scatterlines!(ax, sol.t[2:end], abs.(F[2:end]))
 end
 
 display(fig)
+<<<<<<< HEAD
 
+=======
+>>>>>>> d6cae7d6141d929ed71d3c04e23bfc44bc7e3f4e

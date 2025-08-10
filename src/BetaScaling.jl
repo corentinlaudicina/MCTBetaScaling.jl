@@ -135,7 +135,7 @@ numerically with Fuchs' scheme.
 """
 function update_Fuchs_parameters!(equation::BetaScalingEquation, solver::ModeCouplingTheory.TimeDoublingSolver, temp_arrays::ModeCouplingTheory.SolverCache, it::Int)
     N = solver.N
-    i2 = 2N
+    i2 = it ÷ 2
     δt = solver.Δt / (4N)
     F_I = temp_arrays.F_I
     F = temp_arrays.F_temp
@@ -155,9 +155,9 @@ function update_Fuchs_parameters!(equation::BetaScalingEquation, solver::ModeCou
     @inbounds for j = 2:it-i2
         c3 += (F[it-j] - F[it-j+1]) * F_I[j]
     end
-    #@inbounds if it-i2 != i2
-    #    c3 += (F[i2] - F[i2+1]) * F_I[it-i2]
-    #end
+    @inbounds if it-i2 != i2
+       c3 += (F[i2] - F[i2+1]) * F_I[it-i2]
+    end
     temp_arrays.C3 = c3
 end
 
