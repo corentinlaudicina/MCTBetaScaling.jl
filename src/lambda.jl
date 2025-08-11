@@ -57,12 +57,12 @@ function compute_lambda(V::Array{<:Real,3}, f::AbstractVector; check_symmetry::B
 
     # λ = ½ ∑_{q,k,p} ℓ[q] V[q,k,p] (1-f[k])^2 (1-f[p])^2 r[k] r[p]
     λ = 0.0
-    @inbounds for q in 1:N
+    for q in 1:N
         s_q = 0.0
         for k in 1:N
             rk = r[k] * one_minus_f_sq[k]
             t = 0.0
-            @simd for p in 1:N
+            for p in 1:N
                 t += V[q,k,p] * (one_minus_f_sq[p] * r[p])
             end
             s_q += rk * t
