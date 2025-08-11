@@ -4,6 +4,7 @@ Package to solve mode-coupling theory like equations
 """
 module MCTBetaScaling
     using ModeCouplingTheory, SpecialFunctions, LinearAlgebra
+    
     export BetaScalingEquation
     export StochasticBetaScalingEquation
 

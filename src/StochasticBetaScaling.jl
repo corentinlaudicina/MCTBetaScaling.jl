@@ -1,18 +1,6 @@
-import ModeCouplingTheory.allocate_temporary_arrays
-import ModeCouplingTheory.initialize_F_temp!
-import ModeCouplingTheory.initialize_integrals!
-import ModeCouplingTheory.update_Fuchs_parameters!
-import ModeCouplingTheory.update_F!
-import ModeCouplingTheory.AbstractNoKernelEquation
-import ModeCouplingTheory.SolverCache
-import ModeCouplingTheory.AbstractSolverCache
-import ModeCouplingTheory.TimeDoublingSolver
-import ModeCouplingTheory.do_time_steps!
-import ModeCouplingTheory.update_integrals!
 
-using SpecialFunctions, LinearAlgebra
 
-include("HelperFunctions.jl")
+
 
  
 struct Laplacian2D5pt
