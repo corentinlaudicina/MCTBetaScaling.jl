@@ -10,7 +10,5 @@ module MCTBetaScaling
     for file in ["HelperFunctions.jl", "BetaScaling.jl", "StochasticBetaScaling.jl"]
         include(file)
     end
-    
-
-
+   
 end # module
