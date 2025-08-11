@@ -4,6 +4,11 @@ import ModeCouplingTheory.initialize_integrals!
 import ModeCouplingTheory.update_Fuchs_parameters!
 import ModeCouplingTheory.update_F!
 import ModeCouplingTheory.AbstractNoKernelEquation
+import ModeCouplingTheory.SolverCache
+import ModeCouplingTheory.AbstractSolverCache
+import ModeCouplingTheory.TimeDoublingSolver
+import ModeCouplingTheory.do_time_steps!
+import ModeCouplingTheory.update_integrals!
 
 
 mutable struct BetaScalingEquationCoefficients{T}
@@ -155,9 +160,9 @@ function update_Fuchs_parameters!(equation::BetaScalingEquation, solver::ModeCou
     @inbounds for j = 2:it-i2
         c3 += (F[it-j] - F[it-j+1]) * F_I[j]
     end
-    #@inbounds if it-i2 != i2
-    #    c3 += (F[i2] - F[i2+1]) * F_I[it-i2]
-    #end
+    @inbounds if it-i2 != i2
+       c3 += (F[i2] - F[i2+1]) * F_I[it-i2]
+    end
     temp_arrays.C3 = c3
 end
 
