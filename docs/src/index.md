@@ -24,3 +24,33 @@ In the figure, the slopes of the straight lines are given by the parameters $-a$
 
 ## References
 Götze, J Phys Condens Matter 2, 8485 (1990)
+
+
+## Stochastic Beta-Relaxation (SBR)
+
+SBR is an extension of the beta-scaling equation, where the parameter $\sigma$ becomes quenched disorder, and a diffusive term is added
+$$\sigma(x) + \alpha \nabla^2g(x,t) - \delta t + \lambda (g(x,t))^2 = \partial_t\intg(x,t-\tau)g(x,\tau)d\tau.$$
+
+This is implemented in 1, 2, and 3 dimensions with periodic boundaries. Example:
+
+```julia
+solver = TimeDoublingSolver(t_max=10^10., verbose=true, tolerance=1e-10, N=64, Δt=1e-12)
+
+L_sys = 100.0 ## physical size of the system
+n = 100 ## number of sites on one side of the lattice
+dims = 2 
+Ls = ntuple(i -> L_sys,  dims)  # Lattice size in each dimension
+ns = ntuple(i -> n, dims)  # Number of sites in one dimension of the lattice
+
+λ = 0.75
+α = 0.1
+t₀ = 0.001
+sigma2 = 0.01  # desired variance
+sigma_limits = sqrt(3 * sigma2)
+x(ϵ) = rand() * 2 * ϵ - ϵ  # Uniform in (-ε, +ε)
+σ_vec = [x(sigma_limits) for i in 1:prod(ns)]  # small random variations near σ = 0
+
+eqn_sys = MCTBetaScaling.StochasticBetaScalingEquation(λ, α, σ_vec, t₀, Ls, ns)
+sol = solve(eqn_sys, solver)
+
+```

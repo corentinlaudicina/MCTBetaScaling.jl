@@ -11,7 +11,6 @@ import ModeCouplingTheory.do_time_steps!
 import ModeCouplingTheory.update_integrals!
 
 using SpecialFunctions, LinearAlgebra
-using FFTW, Statistics
 
 include("HelperFunctions.jl")
 
@@ -23,7 +22,7 @@ struct Laplacian2D5pt
 end
 
 
-mutable struct StochasticBetaScalingEquationCoefficients{T, V}
+mutable struct StochasticBetaScalingEquationCoefficients{T, V, DIMS}
     λ::T
     α::T
     σ::V
@@ -32,17 +31,17 @@ mutable struct StochasticBetaScalingEquationCoefficients{T, V}
     δ_times_t::V
     a::T
     b::T
-    L_sys::T
+    L_sys::NTuple{DIMS, T}  # System size in 2D
     A1::T           
 end
 
-struct StochasticBetaScalingEquation{T,A,B,C,D} <: AbstractNoKernelEquation
+struct StochasticBetaScalingEquation{T,A,B,C,D, DIMS} <: AbstractNoKernelEquation
     coeffs::T
     F₀::A
     K₀::B
     kernel::C
     update_coefficients!::D
-    Nx::Int ## number of spatial sites
+    ns::NTuple{DIMS, Int}  # Number of sites in each dimension
 end
 
 function StochasticBetaScalingEquationCoefficients(λ, α, σ, t₀, δ, L_sys)
@@ -53,42 +52,51 @@ function StochasticBetaScalingEquationCoefficients(λ, α, σ, t₀, δ, L_sys)
     return StochasticBetaScalingEquationCoefficients(λ, α, σ, t₀, δ, δ*0.0, a, b, L_sys, A1)
 end
 
-function StochasticBetaScalingEquation(λ::Float64, α::Float64, σ::Vector{Float64}, t₀::Float64, L_sys::Float64; δ=zeros(length(σ)))
+
+"""
+    StochasticBetaScalingEquation(λ::Float64, α::Float64, σ::Vector{Float64}, t₀::Float64, L_sys::NTuple{DIMS, Float64}, ns::NTuple{DIMS, Int}; δ=zeros(length(σ))) where DIMS
+
+Creates a stochastic β-scaling equation object for a system with specified parameters.
+This equation is defined as:
+
+    σ(x) - δ t + λ (g(x,t))² + α ∇²g(x,t) = ∂ₜ∫g(x, t-τ)g(x, τ)dτ
+
+where `σ` is a vector of site-dependent noise, `δ` is a vector of damping coefficients,
+`λ` is the coupling constant, `α` is the diffusion coefficient, `t₀` is a reference time, and `L_sys` is the system size in each dimension.
+"""
+function StochasticBetaScalingEquation(λ::Float64, α::Float64, σ::Vector{Float64}, t₀::Float64, L_sys::NTuple{DIMS, Float64}, ns::NTuple{DIMS, Int}; δ=zeros(length(σ))) where DIMS
+    @assert allequal(L_sys) "L must be equal in all dimensions."
+    @assert allequal(ns) "ns must be a tuple of equal dimensions."
+    @assert length(σ) == prod(ns) "Length of σ must match the product of ns dimensions."
     coeffs = StochasticBetaScalingEquationCoefficients(λ, α, σ, t₀, δ, L_sys)
     function update_coefficients!(coeffs::StochasticBetaScalingEquationCoefficients, t::Float64)
         @inbounds for k in eachindex(coeffs.σ)
             coeffs.δ_times_t[k] = coeffs.δ[k] * t
         end
     end
+    @assert prod(ns) == length(σ)
     Nx = length(σ)
     F0 = fill(0.0, Nx)
-    return StochasticBetaScalingEquation(coeffs, F0, nothing, nothing, update_coefficients!, Nx)
+    return StochasticBetaScalingEquation(coeffs, F0, nothing, nothing, update_coefficients!, ns)
 end
 
+"""
+    StochasticBetaScalingEquation(λ::Float64, α::Float64, σ::Vector{Float64}, t₀::Float64, L_sys::Float64, ns::Int; δ=zeros(length(σ)))
 
-
+Creates a stochastic β-scaling equation object for a system with specified parameters.
+This is a convenience constructor 1D systems.
+"""
+function StochasticBetaScalingEquation(λ::Float64, α::Float64, σ::Vector{Float64}, t₀::Float64, L_sys::Float64, ns::Int; δ=zeros(length(σ)))
+    return StochasticBetaScalingEquation(λ, α, σ, t₀, (L_sys,), (ns, ); δ=δ)
+end
 
 
 
 function Base.show(io::IO, ::MIME"text/plain", p::StochasticBetaScalingEquation)
     println(io, "MCT Stochastic beta-scaling object:")
-    println(io, "   σ - δ t + λ (g(t))² = ∂ₜ∫g(t-τ)g(τ)dτ")
-    println(io, "with real-valued parameters.")
-end
-
-
-
-
-function StochasticBetaScalingEquation(λ::Float64, α::Float64, σ::Vector{Float64}, t₀::Float64, L_sys::Float64; δ=zeros(length(σ)), A1::Float64=1.0)
-    coeffs = StochasticBetaScalingEquationCoefficients(λ, α, σ, t₀, δ, L_sys)
-    function update_coefficients!(coeffs::StochasticBetaScalingEquationCoefficients, t::Float64)
-        @inbounds for k in eachindex(coeffs.σ)
-            coeffs.δ_times_t[k] = coeffs.δ[k] * t
-        end
-    end
-    Nx = length(σ)
-    F0 = fill(0.0, Nx)  # Initial condition for g(t)
-    return StochasticBetaScalingEquation(coeffs, F0, nothing, nothing, update_coefficients!, Nx)
+    println(io, "   σ(x) - δ t + λ (g(x,t))² + α * ∇²g(x,t) = ∂ₜ∫g(x, t-τ)g(x, τ)dτ")
+    println(io, "   λ = $(p.coeffs.λ), α = $(p.coeffs.α), t₀ = $(p.coeffs.t₀), δ = $(p.coeffs.δ)")
+    println(io, "   L_sys = $(p.coeffs.L_sys), with $(p.ns) sites in each dimension.")
 end
 
 
@@ -98,33 +106,27 @@ function allocate_temporary_arrays(eq::StochasticBetaScalingEquation,
     start_time = time()
     F_temp = Vector{Float64}[]
     F_I    = Vector{Float64}[]
-    Nx     = eq.Nx
-    nside  = Int(sqrt(Nx))
-    @assert nside*nside == Nx "Nx must be a perfect square (2D grid)."
-
-    # Build spectral cache once
-    Lx = eq.coeffs.L_sys
-    Ly = eq.coeffs.L_sys
+    Ntot     = prod(eq.ns)
 
     temp_arrays = ModeCouplingTheory.SolverCache(
         F_temp,
         nothing,
         F_I,
         nothing,
-        zeros(Nx),   # c1
-        zeros(Nx),   # c1_temp
-        zeros(Nx),   # c2
-        zeros(Nx),   # c3
-        zeros(Nx),   # temp_vec
-        zeros(Nx),   # F_old
+        zeros(Ntot),   # c1
+        zeros(Ntot),   # c1_temp
+        zeros(Ntot),   # c2
+        zeros(Ntot),   # c3
+        zeros(Ntot),   # temp_vec
+        zeros(Ntot),   # F_old
         nothing,     # temp_mat
         nothing,   # solve_cache
         true,
         start_time
     )
     for _ in 1:4*solver.N
-        push!(temp_arrays.F_temp, fill(0.0, Nx))
-        push!(temp_arrays.F_I,    fill(0.0, Nx))
+        push!(temp_arrays.F_temp, fill(0.0, Ntot))
+        push!(temp_arrays.F_I,    fill(0.0, Ntot))
     end
     return temp_arrays
 end
@@ -137,7 +139,7 @@ end
 Fills the first 2N entries of the temporary arrays needed for solving the
 β-scaling equation with a an adapted Fuchs scheme.
 
-In particular, this initializes g(t) = (t/t₀)^-a.
+In particular, this initializes g(t) = (t/t₀)^-a + A1 * σ(x) * (t/t0)^(a)
 
 """
 function initialize_F_temp!(equation::StochasticBetaScalingEquation,
@@ -239,18 +241,49 @@ function update_Fuchs_parameters!(equation::StochasticBetaScalingEquation,
     end
 end
 
-
-# Periodic 4-neighbour sum: out = sum of N,S,E,W of x
-function neighbor_sum4!(out::Vector{Float64}, x::Vector{Float64}, nside::Int)
-    X = reshape(x, nside, nside)
-    O = reshape(out, nside, nside)
-    @inbounds for j in 1:nside, i in 1:nside
+# periodic 1-dim neighbor sum: out = sum of N,S of x
+function neighbor_sum!(out::Vector{Float64}, x::Vector{Float64}, ns::NTuple{1, Int})
+    X = reshape(x, ns...)
+    O = reshape(out, ns...)
+    @inbounds for i in 1:ns[1]
         ip = (i == nside) ? 1 : i+1
         im = (i == 1)     ? nside : i-1
-        jp = (j == nside) ? 1 : j+1
-        jm = (j == 1)     ? nside : j-1
+        O[i,j] = X[im] + X[ip]
+    end
+    return out
+end
+
+# Periodic 2*dims-neighbour sum: out = sum of N,S,E,W of x
+function neighbor_sum!(out::Vector{Float64}, x::Vector{Float64}, ns::NTuple{2, Int})
+    X = reshape(x, ns...)
+    O = reshape(out, ns...)
+    nsidey, nsidex = ns
+    @inbounds for j in 1:nsidey, i in 1:nsidex
+        ip = (i == nsidex) ? 1 : i+1
+        im = (i == 1)     ? nsidex : i-1
+        jp = (j == nsidey) ? 1 : j+1
+        jm = (j == 1)     ? nsidey : j-1
         O[i,j] = X[im,j] + X[ip,j] + X[i,jm] + X[i,jp]
     end
+    return out
+end
+
+# Periodic 3*dims-neighbour sum: out = sum of N,S,E,W,U,D of x
+function neighbor_sum!(out::Vector{Float64}, x::Vector{Float64}, ns::NTuple{3, Int})
+    X = reshape(x, ns...)
+    O = reshape(out, ns...)
+    nsidez, nsidey, nsidex = ns
+    @inbounds for k in 1:nsidez, j in 1:nsidey, i in 1:nsidex
+        ip = (i == nsidex) ? 1 : i+1
+        im = (i == 1)     ? nsidex : i-1
+        jp = (j == nsidey) ? 1 : j+1
+        jm = (j == 1)     ? nsidey : j-1
+        kp = (k == nsidez) ? 1 : k+1
+        km = (k == 1)     ? nsidez : k-1
+        O[i,j,k] = X[im,j,k] + X[ip,j,k] + X[i,jm,k] + X[i,jp,k] +
+                   X[i,j,km] + X[i,j,kp]
+    end
+
     return out
 end
 
@@ -267,12 +300,13 @@ function update_F!(equation::StochasticBetaScalingEquation,
     C3 = temp.C3
 
     # grid/spacing
-    Nx    = length(C1)
-    nside = Int(round(sqrt(Nx)))
-    @assert nside*nside == Nx "Nx must be a perfect square grid."
-    dx    = equation.coeffs.L_sys / nside
+    Ntot    = length(C1)
+    ns = equation.ns
+    L_sys = equation.coeffs.L_sys
+    dx    = L_sys[1] / ns[1]
+ 
     αeff  = α / (dx*dx)
-    z     = 2.0           # 2D: 4 neighbours → center shift = 2*αeff
+    z     = length(ns)           # number of neighbors / 2
 
     # time slices
     g  = temp.F_temp[it]
@@ -280,19 +314,19 @@ function update_F!(equation::StochasticBetaScalingEquation,
     g2 = temp.F_temp[it-2]
 
     # extrapolated start
-    @inbounds @simd for i in 1:Nx
+    @inbounds @simd for i in 1:Ntot
         g[i] = 2*g1[i] - g2[i]
     end
 
     # g0 bracket (reuse cache F_old)
     g0 = temp.F_old
-    @inbounds @simd for i in 1:Nx
+    @inbounds @simd for i in 1:Ntot
         g0[i] = root_no_nabla(C1[i], C3[i], λ)
     end
 
     # b_i = C1/2 + z*αeff  (reuse c1_temp)
     b = temp.C1_temp
-    @inbounds @simd for i in 1:Nx
+    @inbounds @simd for i in 1:Ntot
         b[i] = 0.5*C1[i] + z*αeff
     end
 
@@ -305,16 +339,16 @@ function update_F!(equation::StochasticBetaScalingEquation,
     iters = 0
     while true
         # sumNN = Σ_4nn g
-        neighbor_sum4!(work, g, nside)
+        neighbor_sum!(work, g, ns)
 
         # work := a_i = C3 - αeff * sumNN
-        @inbounds for i in 1:Nx
+        @inbounds for i in 1:Ntot
             work[i] = C3[i] - αeff*work[i]
         end
 
-        # sitewise regula falsi, in-place update of g
+        # analytic sol. otherwise sitewise Ill. regula falsi, in-place update of g
         maxrel = 0.0
-        @inbounds for i in 1:Nx
+        @inbounds for i in 1:Ntot
             gi_old = g[i]
             ok, gi_try = quad_root_safe(λ, b[i], work[i], gi_old)
             gi_new = ok ? gi_try : regula_falsi_illinois(λ, b[i], work[i], gi_old, g0[i];
