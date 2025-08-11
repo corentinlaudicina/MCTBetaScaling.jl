@@ -110,33 +110,33 @@ end
 
 # We solve MCT for hard spheres at a volume fraction of 0.51591
 
-η = 0.515914; 
-ρ = η*6/π; kBT = 1.0; m = 1.0
+# η = 0.515914; 
+# ρ = η*6/π; kBT = 1.0; m = 1.0
 
-Nk = 100; kmax = 40.0; 
-dk = kmax/Nk; k_array = dk*(collect(1:Nk) .- 0.5) # construct the grid this way to satisfy the assumptions
-                                                # of the discretization.
-Sₖ = find_analytical_S_k(k_array, η)
+# Nk = 100; kmax = 40.0; 
+# dk = kmax/Nk; k_array = dk*(collect(1:Nk) .- 0.5) # construct the grid this way to satisfy the assumptions
+#                                                 # of the discretization.
+# Sₖ = find_analytical_S_k(k_array, η)
 
-∂F0 = zeros(Nk); α = 1.0; β = 0.0; γ = @. k_array^2*kBT/(m*Sₖ); δ = 0.0
+# ∂F0 = zeros(Nk); α = 1.0; β = 0.0; γ = @. k_array^2*kBT/(m*Sₖ); δ = 0.0
 
-kernel = ModeCouplingTheory.dDimModeCouplingKernel(ρ, kBT, m, k_array, Sₖ, 3)
-sol = solve_steady_state(γ, Sₖ, kernel; tolerance=10^-8, verbose=false)
-fk = get_F(sol, 1, :)
+# kernel = ModeCouplingTheory.dDimModeCouplingKernel(ρ, kBT, m, k_array, Sₖ, 3)
+# sol = solve_steady_state(γ, Sₖ, kernel; tolerance=10^-8, verbose=false)
+# fk = get_F(sol, 1, :)
 
-V = kernel.prefactor .* kernel.V .* kernel.J
+# V = kernel.prefactor .* kernel.V .* kernel.J
 
-# divided by omega
-# and multiplied by Sk Sp to satisfy conventions
-for q in 1:Nk, k in 1:Nk, p in 1:Nk
-    V[q,k,p] = V[q,k,p] * Sₖ[k] * Sₖ[p] / γ[q]
-end
+# # divided by omega
+# # and multiplied by Sk Sp to satisfy conventions
+# for q in 1:Nk, k in 1:Nk, p in 1:Nk
+#     V[q,k,p] = V[q,k,p] * Sₖ[k] * Sₖ[p] / γ[q]
+# end
 
-# normalize fk
-fk = fk ./ Sₖ
+# # normalize fk
+# fk = fk ./ Sₖ
 
-λ, r, l, C = compute_lambda(V, fk; check_symmetry=true)
-eig = eigen(C).values
-largest_eigval_C_idx = argmax(real.(eig))
+# λ, r, l, C = compute_lambda(V, fk; check_symmetry=true)
+# eig = eigen(C).values
+# largest_eigval_C_idx = argmax(real.(eig))
 
-@show eig[largest_eigval_C_idx], λ, η
+# @show eig[largest_eigval_C_idx], λ, η
