@@ -45,7 +45,7 @@ ax = Axis(fig[1, 1],
 
 for i in 1:ns[1]:prod(ns)
     F = get_F(sol, :, i)
-    scatterlines!(ax, sol.t[2:end], abs.(F[2:end]))
+    scatterlines!(ax, sol.t, abs.(F))
 end
 
 display(fig)
