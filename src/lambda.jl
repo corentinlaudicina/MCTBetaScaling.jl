@@ -32,10 +32,10 @@ function compute_lambda(V::Array{<:Real,3}, f::AbstractVector; check_symmetry::B
     C = zeros(Float64, N, N)
     @inbounds for q in 1:N, k in 1:N
         s = 0.0
-        @simd for p in 1:N
+        for p in 1:N
             s += V[q,k,p] * f[p]
         end
-        C[q,k] = s * one_minus_f_sq[k]
+        C[q,k] = 2 *  s * one_minus_f_sq[k]
     end
 
     # leading right/left eigenvectors (eigval ≈ 1 at criticality)
@@ -67,63 +67,76 @@ function compute_lambda(V::Array{<:Real,3}, f::AbstractVector; check_symmetry::B
             end
             s_q += rk * t
         end
-        λ += ℓ[q] * s_q
+        λ += ℓ[q] * s_q #/ (one_minus_f_sq[q])
     end
     λ *= 0.5
 
     return (λ, r, ℓ, C)
 end
 
-# """
-#     find_analytical_C_k(k, η)
-# Finds the direct correlation function given by the 
-# analytical Percus-Yevick solution of the Ornstein-Zernike 
-# equation for hard spheres for a given volume fraction η.
+"""
+    find_analytical_C_k(k, η)
+Finds the direct correlation function given by the 
+analytical Percus-Yevick solution of the Ornstein-Zernike 
+equation for hard spheres for a given volume fraction η.
 
-# Reference: Wertheim, M. S. "Exact solution of the Percus-Yevick integral equation 
-# for hard spheres." Physical Review Letters 10.8 (1963): 321.
-# """ 
-# function find_analytical_C_k(k, η)
-#     A = -(1 - η)^-4 *(1 + 2η)^2
-#     B = (1 - η)^-4*  6η*(1 + η/2)^2
-#     D = -(1 - η)^-4 * 1/2 * η*(1 + 2η)^2
-#     Cₖ = @. 4π/k^6 * 
-#     (
-#         24*D - 2*B * k^2 - (24*D - 2 * (B + 6*D) * k^2 + (A + B + D) * k^4) * cos(k)
-#      + k * (-24*D + (A + 2*B + 4*D) * k^2) * sin(k)
-#      )
-#     return Cₖ
-# end
+Reference: Wertheim, M. S. "Exact solution of the Percus-Yevick integral equation 
+for hard spheres." Physical Review Letters 10.8 (1963): 321.
+""" 
+function find_analytical_C_k(k, η)
+    A = -(1 - η)^-4 *(1 + 2η)^2
+    B = (1 - η)^-4*  6η*(1 + η/2)^2
+    D = -(1 - η)^-4 * 1/2 * η*(1 + 2η)^2
+    Cₖ = @. 4π/k^6 * 
+    (
+        24*D - 2*B * k^2 - (24*D - 2 * (B + 6*D) * k^2 + (A + B + D) * k^4) * cos(k)
+     + k * (-24*D + (A + 2*B + 4*D) * k^2) * sin(k)
+     )
+    return Cₖ
+end
 
-# """
-#     find_analytical_S_k(k, η)
-# Finds the static structure factor given by the 
-# analytical Percus-Yevick solution of the Ornstein-Zernike 
-# equation for hard spheres for a given volume fraction η.
-# """ 
-# function find_analytical_S_k(k, η)
-#         Cₖ = find_analytical_C_k(k, η)
-#         ρ = 6/π * η
-#         Sₖ = @. 1 + ρ*Cₖ / (1 - ρ*Cₖ)
-#     return Sₖ
-# end
+"""
+    find_analytical_S_k(k, η)
+Finds the static structure factor given by the 
+analytical Percus-Yevick solution of the Ornstein-Zernike 
+equation for hard spheres for a given volume fraction η.
+""" 
+function find_analytical_S_k(k, η)
+        Cₖ = find_analytical_C_k(k, η)
+        ρ = 6/π * η
+        Sₖ = @. 1 + ρ*Cₖ / (1 - ρ*Cₖ)
+    return Sₖ
+end
 
-# # We solve MCT for hard spheres at a volume fraction of 0.51591
-# η = 0.51593; ρ = η*6/π; kBT = 1.0; m = 1.0
+# We solve MCT for hard spheres at a volume fraction of 0.51591
 
-# Nk = 100; kmax = 40.0; 
-# dk = kmax/Nk; k_array = dk*(collect(1:Nk) .- 0.5) # construct the grid this way to satisfy the assumptions
-#                                                   # of the discretization.
-# Sₖ = find_analytical_S_k(k_array, η)
+η = 0.515914; 
+ρ = η*6/π; kBT = 1.0; m = 1.0
 
-# ∂F0 = zeros(Nk); α = 1.0; β = 0.0; γ = @. k_array^2*kBT/(m*Sₖ); δ = 0.0
+Nk = 100; kmax = 40.0; 
+dk = kmax/Nk; k_array = dk*(collect(1:Nk) .- 0.5) # construct the grid this way to satisfy the assumptions
+                                                # of the discretization.
+Sₖ = find_analytical_S_k(k_array, η)
 
-# kernel = ModeCouplingTheory.dDimModeCouplingKernel(ρ, kBT, m, k_array, Sₖ, 3)
-# sol = solve_steady_state(γ, Sₖ, kernel; tolerance=10^-8, verbose=false)
-# fk = get_F(sol, 1, :)
+∂F0 = zeros(Nk); α = 1.0; β = 0.0; γ = @. k_array^2*kBT/(m*Sₖ); δ = 0.0
 
-# V = kernel.prefactor .* kernel.V .* kernel.J
+kernel = ModeCouplingTheory.dDimModeCouplingKernel(ρ, kBT, m, k_array, Sₖ, 3)
+sol = solve_steady_state(γ, Sₖ, kernel; tolerance=10^-8, verbose=false)
+fk = get_F(sol, 1, :)
 
-# λ, r, l, C = compute_lambda(V, fk; check_symmetry=true)
+V = kernel.prefactor .* kernel.V .* kernel.J
 
+# divided by omega
+# and multiplied by Sk Sp to satisfy conventions
+for q in 1:Nk, k in 1:Nk, p in 1:Nk
+    V[q,k,p] = V[q,k,p] * Sₖ[k] * Sₖ[p] / γ[q]
+end
 
+# normalize fk
+fk = fk ./ Sₖ
+
+λ, r, l, C = compute_lambda(V, fk; check_symmetry=true)
+eig = eigen(C).values
+largest_eigval_C_idx = argmax(real.(eig))
+
+@show eig[largest_eigval_C_idx], λ, η
