@@ -331,7 +331,11 @@ function update_F!(equation::StochasticBetaScalingEquation,
         end
 
         iters += 1
-        if (maxrel <= tol_rel) || (iters >= maxit)
+        if (maxrel <= tol_rel) 
+            return
+        end
+        if (iters >= maxit)
+            error("Max iterations reached without convergence")
             return
         end
     end
