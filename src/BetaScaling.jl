@@ -4,6 +4,11 @@ import ModeCouplingTheory.initialize_integrals!
 import ModeCouplingTheory.update_Fuchs_parameters!
 import ModeCouplingTheory.update_F!
 import ModeCouplingTheory.AbstractNoKernelEquation
+import ModeCouplingTheory.SolverCache
+import ModeCouplingTheory.AbstractSolverCache
+import ModeCouplingTheory.TimeDoublingSolver
+import ModeCouplingTheory.do_time_steps!
+import ModeCouplingTheory.update_integrals!
 
 
 mutable struct BetaScalingEquationCoefficients{T}
