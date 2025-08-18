@@ -5,8 +5,9 @@ module MCTBetaScaling
     
     export BetaScalingEquation
     export StochasticBetaScalingEquation
+    export compute_lambda
 
-    for file in ["HelperFunctions.jl", "BetaScaling.jl", "StochasticBetaScaling.jl"]
+    for file in ["HelperFunctions.jl", "BetaScaling.jl", "StochasticBetaScaling.jl", "lambda.jl"]
         include(file)
     end
    
