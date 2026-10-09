@@ -39,10 +39,17 @@ end
 
 
 
-function BetaScalingEquationCoefficients(λ, σ, t₀, δ)
+# MCT exponents from λ = Γ(1-a)²/Γ(1-2a) = Γ(1+b)²/Γ(1+2b): a and -b are the roots of
+# the same function on either side of 0.
+function _exponents(λ)
     exponent_func = (x) -> (SpecialFunctions.gamma(1 - x) / SpecialFunctions.gamma(1 - 2x)) * SpecialFunctions.gamma(1 - x) - λ
     a = regula_falsi(0.2, 0.3, exponent_func)
     b = -regula_falsi(-0.5, -0.1, exponent_func)
+    return a, b
+end
+
+function BetaScalingEquationCoefficients(λ, σ, t₀, δ)
+    a, b = _exponents(λ)
     return BetaScalingEquationCoefficients(λ, σ, t₀, δ, Float64(0.0), a, b)
 end
 
@@ -159,9 +166,6 @@ function update_Fuchs_parameters!(equation::BetaScalingEquation, solver::ModeCou
     end
     @inbounds for j = 2:it-i2
         c3 += (F[it-j] - F[it-j+1]) * F_I[j]
-    end
-    @inbounds if it-i2 != i2
-       c3 += (F[i2] - F[i2+1]) * F_I[it-i2]
     end
     temp_arrays.C3 = c3
 end

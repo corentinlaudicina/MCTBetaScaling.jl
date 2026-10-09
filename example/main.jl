@@ -1,8 +1,7 @@
-import Pkg;
-Pkg.activate(".")
-using Revise, Random
-using ModeCouplingTheory, CairoMakie
-include("../src/MCTBetaScaling.jl")
+import Pkg
+Pkg.activate(@__DIR__); Pkg.instantiate()
+using Random
+using ModeCouplingTheory, CairoMakie, MCTBetaScaling
 
 Random.seed!(1234)  # For reproducibility
 

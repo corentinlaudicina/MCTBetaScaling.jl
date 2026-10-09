@@ -6,9 +6,9 @@ makedocs(
     format = Documenter.HTML(),
     modules = [MCTBetaScaling],
     pages = [
-        "src/index.md",
-        "src/lambda.md",
-        "src/API.md"
+        "index.md",
+        "lambda.md",
+        "API.md"
     ]
 )
 

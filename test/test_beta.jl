@@ -35,7 +35,7 @@ i1 = end_t - Nterms + 1
 @test isapprox(
     sum((@. (sol.t[i1:end_t]/t0)^-equation.coeffs.b * sol.F[i1:end_t]))/Nterms,
     -0.681sqrt(abs(σ))*abs(σ)^(equation.coeffs.b/(2*equation.coeffs.a)),
-    rtol=10^-2.
+    rtol=2e-3
 )
 
 

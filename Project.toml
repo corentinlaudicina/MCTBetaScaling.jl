@@ -1,13 +1,17 @@
 name = "MCTBetaScaling"
 uuid = "89e7ec30-1fdf-11ee-08a6-c5e7866bad12"
-authors = ["s158686 "]
 version = "0.0.1"
+authors = ["s158686 "]
 
 [deps]
+Dierckx = "39dd38d3-220a-591b-8e3c-4c3a8c710a94"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 ModeCouplingTheory = "6cad4188-63cb-4528-a10f-dbb409b456c6"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 
 [compat]
-SpecialFunctions = "2"
+Dierckx = "0.5"
+ForwardDiff = "0.10, 1"
 ModeCouplingTheory = "0.8.9"
+SpecialFunctions = "2"
