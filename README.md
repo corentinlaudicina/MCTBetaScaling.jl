@@ -61,11 +61,11 @@ For a one-component system, the plateau of the MCT equations and the critical ei
 | `compute_mu`, `compute_DeltaSigma2` | variance `Δσ² = μ² n_c S(0)` of the quenched fluctuations of `σ` |
 | `compute_gamma` | gradient coefficient `Γ`, the `α` of SBR |
 
-They take a `dDimModeCouplingKernel` from ModeCouplingTheory.jl and the normalized plateau `f(k) = F∞(k)/S(k)`; `compute_lambda` and `compute_gamma` also accept a `BipolarMCTKernel`, and `compute_lambda_multicomponent` takes the multicomponent kernel. See the docstrings for the exact arguments.
+They take a `dDimModeCouplingKernel` from ModeCouplingTheory.jl and the normalized plateau `f(k) = F∞(k)/S(k)`; `compute_lambda` and `compute_gamma` also accept a `BipolarMCTKernel`, and `compute_lambda_multicomponent` takes the multicomponent kernel. See the docstrings for the exact arguments. 
 
 ### Γ and the dynamic correlation length
 
-`Γ` is the `q²` coefficient of the top eigenvalue of the stability operator at finite wavevector, `E0(q) = E0 - Γq² + …`. On the glass side, where `1 - E0 = 2g(1-λ)√ε`, the plateau fluctuations have correlation length `ξ = ξ₀ ε^{-1/4}` with `ξ₀² = Γ/(2g(1-λ))`.
+`Γ` is the `q²` coefficient of the top eigenvalue of the stability operator at finite wavevector, `E0(q) = E0 - Γq² + …`. On the glass side, where `1 - E0 = 2g(1-λ)√ε`, the plateau fluctuations have correlation length `ξ = ξ₀ ε^{-1/4}` with `ξ₀² = Γ/(2g(1-λ))`. 
 
 `λ` and `Γ` change like `√ε` near the transition, so the critical values come from the critical point of the discretised equations and an extrapolation `ε → 0`:
 
@@ -86,7 +86,9 @@ rows = glass_sweep(system, φc, [1e-3, 3e-4, 1e-4, 3e-5, 1e-5, 3e-6, 1e-6])
 sweep_summary(rows)                                    # Γc, λc, 2g(1-λ), ξ₀, ξ₀²
 ```
 
-On this grid it gives `φc = 0.5159121`, `λc = 0.735`, `2g(1-λ) = 1.279`, `Γc = 0.0973` and `ξ₀² = 0.0761` (lengths in units of the particle diameter). The value ≈ 0.07 quoted for hard spheres from the fit of Biroli et al. is `ξ₀²`, not `Γ`.
+On this grid it gives `φc = 0.5159121`, `λc = 0.735`, `2g(1-λ) = 1.279`, `Γc = 0.0973` and `ξ₀² = 0.0761` (lengths in units of the particle diameter).
+
+The mode-coupling expressions are typically found scattered across the MCT literature, and are all contained (with microscopic expressions) in Laudicina et al. PRE 114 (3), 035411, (2026).
 
 Also provided:
 
@@ -102,3 +104,4 @@ The [example](example/) folder has scripts for each quantity: `lambda.jl`, `lamb
 - T. Rizzo, EPL 106, 56003 (2014) — stochastic β-relaxation.
 - G. Biroli, J.-P. Bouchaud, K. Miyazaki and D. R. Reichman, Phys. Rev. Lett. 97, 195701 (2006) — inhomogeneous MCT and the dynamic correlation length.
 - M. S. Wertheim, Phys. Rev. Lett. 10, 321 (1963) — Percus–Yevick hard spheres.
+- C.C.L. Laudicina, L.M.C. Janssen, G. Szamel Phys. Rev. Lett. 137 (11), 118201 & Phys. Rev. E 114 (3), 035411 — computation of all coupling constants for SBR from S(k). 
